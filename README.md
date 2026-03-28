@@ -1,8 +1,20 @@
 # Monad Family Contracts
 
-> An onchain agent lifecycle protocol built with Solidity, Foundry, and a Monad-first deployment workflow.
+> A Monad-native onchain agent lifecycle protocol built with Solidity, Foundry, and a production-style modular architecture.
 
 `MonadFamily` models autonomous agents as ERC-721 NFTs that can work, build compatibility, marry, raise children, retire, and be traded. The system is split into dedicated modules so lifecycle rules, accounting, and market behavior stay explicit and testable.
+
+## Monad Hackathon Submission
+
+`MonadFamily` is designed as a playful but technically serious consumer protocol for Monad: a fully onchain world where agents behave like households with memory, economics, relationships, inheritance, and open market mobility.
+
+Why it fits Monad well:
+
+- Fast, low-cost execution makes repeated lifecycle actions practical onchain
+- Native asset flows let rewards, household balances, inheritance, and trading happen in `MON`
+- Modular contracts make the protocol easy to demo, extend, and judge during a hackathon review
+
+For reviewer readability, this README expresses human-facing native-token amounts in `MON`. The Solidity contracts and scripts still use standard EVM base units under the hood.
 
 ## Overview
 
@@ -37,9 +49,9 @@ Each agent NFT stores:
 | Marriage compatibility threshold | `80` |
 | Compatibility increment per paired work session | `5` |
 | Child funding contribution per parent | `10%` of parent balance |
-| Move-out house fund | `0.5 ether` |
-| Base work reward | `0.001 ether` |
-| Risk reward step | `0.00001 ether` per variance unit |
+| Move-out house fund | `0.5 MON` |
+| Base work reward | `0.001 MON` |
+| Risk reward step | `0.00001 MON` per variance unit |
 | Job mutation chance for children | `30%` |
 
 ### Lifecycle Flow
@@ -163,13 +175,13 @@ This starts Anvil on `http://127.0.0.1:8545` with the standard Foundry test mnem
 ### 2. Deploy Locally
 
 ```bash
-make deploy-local INITIAL_REWARD_POOL=100000000000000000000
+make deploy-local INITIAL_REWARD_POOL=100000000000000000000 # 100 MON
 ```
 
 Useful variants:
 
 ```bash
-make dry-run-local INITIAL_REWARD_POOL=100000000000000000000
+make dry-run-local INITIAL_REWARD_POOL=100000000000000000000 # 100 MON
 make rpc-local
 ```
 
@@ -212,14 +224,21 @@ The repository includes a Monad-focused deployment path and an existing deployme
 | `ALICE_PRIVATE_KEY` | Actor key for Monad end-to-end script |
 | `BOB_PRIVATE_KEY` | Actor key for Monad end-to-end script |
 | `CAROL_PRIVATE_KEY` | Actor key for Monad end-to-end script |
-| `INITIAL_REWARD_POOL` | Optional initial reward funding for deployment |
+| `INITIAL_REWARD_POOL` | Optional initial reward funding for deployment, passed in base units |
 | `FREEZE_MODULE_WIRING` | Optional wiring freeze toggle after deployment |
-| `E2E_ACTOR_FUNDING` | Optional native token funding for E2E actors |
-| `E2E_SALE_PRICE` | Optional marketplace sale price in the E2E script |
+| `E2E_ACTOR_FUNDING` | Optional `MON` funding for E2E actors, passed in base units |
+| `E2E_SALE_PRICE` | Optional sale price in `MON` base units for the E2E script |
 | `E2E_CHILD_NAME` | Optional child name for the E2E script |
 | `E2E_CHILD_CID` | Optional child metadata CID for the E2E script |
 
 The `Makefile` normalizes private keys from `.env` by adding a `0x` prefix automatically when needed.
+
+Example:
+
+```bash
+INITIAL_REWARD_POOL=100000000000000000000 # 100 MON
+E2E_SALE_PRICE=1000000000000000000        # 1 MON
+```
 
 ### Deploy to Monad Testnet
 
@@ -262,7 +281,7 @@ Deployment metadata in the same file shows:
 - Network: `monad-testnet`
 - Chain ID: `10143`
 - Module wiring frozen: `false`
-- Initial reward pool at deployment: `0 wei`
+- Initial reward pool at deployment: `0 MON`
 
 ## Testing Strategy
 
@@ -286,6 +305,7 @@ Foundry is configured with:
 - Marketplace purchases are protected by a reentrancy guard and seller ownership re-checks.
 - Reward generation and child trait blending use block-derived entropy, so live-chain outputs are intentionally non-deterministic.
 - The marketplace is not opinionated about lifecycle status; even retired agents remain transferable if owners choose to trade them.
+- Human-facing documentation uses `MON`, while Solidity arithmetic still relies on standard EVM native-unit conventions internally.
 
 ## Useful Commands
 
