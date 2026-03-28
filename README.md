@@ -29,6 +29,14 @@ This repository contains a four-contract protocol:
 
 The project is organized as a Foundry workspace with unit, integration, and invariant tests plus deployment and end-to-end scripts for local Anvil and Monad testnet.
 
+## Frontend Repository
+
+The frontend for Monad Family lives in the separate `monad-family` repository:
+
+- https://github.com/azizemreerdogan/monad-family
+
+Use that repository for the web app, wallet flow, and contract integration UI. This repository contains the Solidity contracts, scripts, and Foundry test suite.
+
 ## Protocol Model
 
 Each agent NFT stores:
