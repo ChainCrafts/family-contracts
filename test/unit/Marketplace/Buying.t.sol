@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
+
 import {Errors} from "../../../src/libraries/Errors.sol";
 import {BaseFixture} from "../../utils/BaseFixture.t.sol";
 import {ReenteringBuyer} from "../../mocks/ReenteringBuyer.sol";
@@ -53,6 +55,24 @@ contract MarketplaceBuyingTest is BaseFixture {
         agentNFT.approve(address(0), aliceAgentId);
 
         vm.expectRevert(abi.encodeWithSelector(Errors.MarketplaceApprovalMissing.selector, aliceAgentId));
+
+        vm.prank(bob);
+        marketplace.buyAgent{value: 1 ether}(aliceAgentId);
+    }
+
+    function test_RevertWhen_BuyCalledWhilePaused() public {
+        vm.deal(bob, 2 ether);
+
+        vm.prank(alice);
+        agentNFT.approve(address(marketplace), aliceAgentId);
+
+        vm.prank(alice);
+        marketplace.listAgent(aliceAgentId, 1 ether);
+
+        vm.prank(owner);
+        marketplace.pause();
+
+        vm.expectRevert(Pausable.EnforcedPause.selector);
 
         vm.prank(bob);
         marketplace.buyAgent{value: 1 ether}(aliceAgentId);

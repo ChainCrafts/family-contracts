@@ -31,6 +31,33 @@ contract AgentNFTMintTest is BaseFixture {
         assertEq(agent.personalityCID, "ipfs://selim");
     }
 
+    function test_GetAgentCoreReturnsCompactFields() public {
+        vm.prank(owner);
+        uint256 agentId = agentNFT.mint(dave, "Selim", AgentTypes.JOB_TRADER, 65, 44, 72, "ipfs://selim");
+
+        (
+            uint256 id,
+            uint8 jobType,
+            uint8 riskScore,
+            uint8 patience,
+            uint8 socialScore,
+            uint256 age,
+            uint256 balance,
+            uint256 partnerId,
+            bool retired
+        ) = agentNFT.getAgentCore(agentId);
+
+        assertEq(id, agentId);
+        assertEq(jobType, AgentTypes.JOB_TRADER);
+        assertEq(riskScore, 65);
+        assertEq(patience, 44);
+        assertEq(socialScore, 72);
+        assertEq(age, 0);
+        assertEq(balance, 0);
+        assertEq(partnerId, 0);
+        assertFalse(retired);
+    }
+
     function test_MintEmitsAgentBorn() public {
         uint256 expectedId = agentNFT.totalAgents() + 1;
 

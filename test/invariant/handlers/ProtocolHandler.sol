@@ -64,6 +64,19 @@ contract ProtocolHandler is Test {
         try familyRegistry.approveMarriage(agentId, otherId) {} catch {}
     }
 
+    function revokeMarriageApproval(uint256 actorSeed, uint256 agentSeed, uint256 otherSeed) external {
+        uint256 totalAgents = agentNFT.totalAgents();
+        if (totalAgents < 2) {
+            return;
+        }
+
+        uint256 agentId = _agentId(agentSeed, totalAgents);
+        uint256 otherId = _differentAgentId(otherSeed, totalAgents, agentId);
+
+        vm.prank(_actor(actorSeed));
+        try familyRegistry.revokeMarriageApproval(agentId, otherId) {} catch {}
+    }
+
     function marry(uint256 actorSeed, uint256 agentSeed, uint256 otherSeed) external {
         uint256 totalAgents = agentNFT.totalAgents();
         if (totalAgents < 2) {
@@ -90,7 +103,7 @@ contract ProtocolHandler is Test {
         try familyRegistry.approveChild(agentId, otherId) {} catch {}
     }
 
-    function mintChild(uint256 actorSeed, uint256 agentSeed, uint256 otherSeed) external {
+    function revokeChildApproval(uint256 actorSeed, uint256 agentSeed, uint256 otherSeed) external {
         uint256 totalAgents = agentNFT.totalAgents();
         if (totalAgents < 2) {
             return;
@@ -100,7 +113,21 @@ contract ProtocolHandler is Test {
         uint256 otherId = _differentAgentId(otherSeed, totalAgents, agentId);
 
         vm.prank(_actor(actorSeed));
-        try agentNFT.mintChild(agentId, otherId, "InvariantKid", "ipfs://invariant-kid") {} catch {}
+        try familyRegistry.revokeChildApproval(agentId, otherId) {} catch {}
+    }
+
+    function mintChild(uint256 actorSeed, uint256 agentSeed, uint256 otherSeed) external {
+        uint256 totalAgents = agentNFT.totalAgents();
+        if (totalAgents < 2) {
+            return;
+        }
+
+        uint256 agentId = _agentId(agentSeed, totalAgents);
+        uint256 otherId = _differentAgentId(otherSeed, totalAgents, agentId);
+        address childOwner = agentNFT.ownerOf(agentId);
+
+        vm.prank(_actor(actorSeed));
+        try agentNFT.mintChild(agentId, otherId, childOwner, "InvariantKid", "ipfs://invariant-kid") {} catch {}
     }
 
     function listAgent(uint256 actorSeed, uint256 agentSeed, uint96 priceSeed) external {
@@ -138,6 +165,20 @@ contract ProtocolHandler is Test {
         try marketplace.buyAgent{value: listing.price}(agentId) {} catch {}
     }
 
+    function transferAgent(uint256 agentSeed, uint256 recipientSeed) external {
+        uint256 totalAgents = agentNFT.totalAgents();
+        if (totalAgents == 0) {
+            return;
+        }
+
+        uint256 agentId = _agentId(agentSeed, totalAgents);
+        address currentOwner = agentNFT.ownerOf(agentId);
+        address recipient = _differentActor(recipientSeed, currentOwner);
+
+        vm.prank(currentOwner);
+        try agentNFT.transferFrom(currentOwner, recipient, agentId) {} catch {}
+    }
+
     function delistAgent(uint256 actorSeed, uint256 agentSeed) external {
         uint256 totalAgents = agentNFT.totalAgents();
         if (totalAgents == 0) {
@@ -165,6 +206,15 @@ contract ProtocolHandler is Test {
         uint256 candidate = _agentId(seed, totalAgents);
         if (candidate == currentAgentId) {
             return currentAgentId == totalAgents ? 1 : currentAgentId + 1;
+        }
+
+        return candidate;
+    }
+
+    function _differentActor(uint256 actorSeed, address currentActor) private view returns (address) {
+        address candidate = _actor(actorSeed);
+        if (candidate == currentActor) {
+            return actors[(actorSeed + 1) % actors.length];
         }
 
         return candidate;

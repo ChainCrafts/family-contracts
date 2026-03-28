@@ -15,7 +15,7 @@ contract LifecycleFlowIntegrationTest is BaseFixture {
         _approveChildBoth(aliceAgentId, bobAgentId);
 
         vm.prank(alice);
-        uint256 childId = agentNFT.mintChild(aliceAgentId, bobAgentId, "Ada", "ipfs://ada");
+        uint256 childId = agentNFT.mintChild(aliceAgentId, bobAgentId, alice, "Ada", "ipfs://ada");
 
         address aliceOwner = agentNFT.ownerOf(aliceAgentId);
         while (agentNFT.getAgent(aliceAgentId).age < AgentTypes.MAX_AGE) {

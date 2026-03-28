@@ -7,6 +7,8 @@ library Errors {
     error AgentRetired(uint256 agentId);
     error AlreadyMarried(uint256 agentId);
     error ChildApprovalMissing(uint256 parentAId, uint256 parentBId);
+    error ConfigurationFrozen();
+    error InvalidChildRecipient(address recipient);
     error CompatibilityTooLow(uint256 agentAId, uint256 agentBId, uint8 compatibility, uint8 threshold);
     error IncorrectPayment(uint256 expected, uint256 actual);
     error InsufficientRewardPool(uint256 requested, uint256 available);

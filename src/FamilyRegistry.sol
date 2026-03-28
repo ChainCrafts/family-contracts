@@ -11,6 +11,7 @@ import {Errors} from "./libraries/Errors.sol";
 contract FamilyRegistry is Ownable, IFamilyRegistry {
     IAgentNFT public immutable agentNFT;
     address public workEngine;
+    bool public moduleWiringFrozen;
 
     mapping(bytes32 pairKey => uint8 compatibility) private _compatibility;
     mapping(bytes32 pairKey => mapping(uint256 agentId => address approverOwner)) private _marriageApprovals;
@@ -18,6 +19,12 @@ contract FamilyRegistry is Ownable, IFamilyRegistry {
 
     event AgentBonded(uint256 indexed agentA, uint256 indexed agentB, uint8 compatibility);
     event AgentMarried(uint256 indexed agentA, uint256 indexed agentB);
+    event MarriageApprovalGranted(uint256 indexed agentSelfId, uint256 indexed agentOtherId, address indexed approver);
+    event MarriageApprovalRevoked(uint256 indexed agentSelfId, uint256 indexed agentOtherId, address indexed approver);
+    event ChildApprovalGranted(uint256 indexed parentAId, uint256 indexed parentBId, address indexed approver);
+    event ChildApprovalRevoked(uint256 indexed parentAId, uint256 indexed parentBId, address indexed approver);
+    event WorkEngineSet(address indexed previousEngine, address indexed newEngine);
+    event ModuleWiringFrozen();
 
     constructor(address initialOwner, address agentNFTAddress) Ownable(initialOwner) {
         if (agentNFTAddress == address(0) || initialOwner == address(0)) {
@@ -42,15 +49,30 @@ contract FamilyRegistry is Ownable, IFamilyRegistry {
     }
 
     function setWorkEngine(address engine) external onlyOwner {
-        if (workEngine != address(0)) {
-            revert Errors.AlreadyConfigured();
+        if (moduleWiringFrozen) {
+            revert Errors.ConfigurationFrozen();
         }
 
         if (engine == address(0)) {
             revert Errors.ZeroAddress();
         }
 
+        address previousEngine = workEngine;
         workEngine = engine;
+        emit WorkEngineSet(previousEngine, engine);
+    }
+
+    function freezeModuleWiring() external onlyOwner {
+        if (moduleWiringFrozen) {
+            revert Errors.ConfigurationFrozen();
+        }
+
+        if (workEngine == address(0)) {
+            revert Errors.NotConfigured();
+        }
+
+        moduleWiringFrozen = true;
+        emit ModuleWiringFrozen();
     }
 
     function approveMarriage(uint256 agentSelfId, uint256 agentOtherId) external {
@@ -59,6 +81,17 @@ contract FamilyRegistry is Ownable, IFamilyRegistry {
 
         bytes32 pairKey = _pairKey(agentSelfId, agentOtherId);
         _marriageApprovals[pairKey][agentSelfId] = agentNFT.ownerOf(agentSelfId);
+
+        emit MarriageApprovalGranted(agentSelfId, agentOtherId, msg.sender);
+    }
+
+    function revokeMarriageApproval(uint256 agentSelfId, uint256 agentOtherId) external {
+        _requireDistinctPair(agentSelfId, agentOtherId);
+        _requireAuthorizedOwnerOrOperator(msg.sender, agentSelfId);
+
+        delete _marriageApprovals[_pairKey(agentSelfId, agentOtherId)][agentSelfId];
+
+        emit MarriageApprovalRevoked(agentSelfId, agentOtherId, msg.sender);
     }
 
     function approveChild(uint256 parentAId, uint256 parentBId) external {
@@ -81,6 +114,17 @@ contract FamilyRegistry is Ownable, IFamilyRegistry {
 
         bytes32 pairKey = _pairKey(parentAId, parentBId);
         _childApprovals[pairKey][parentAId] = agentNFT.ownerOf(parentAId);
+
+        emit ChildApprovalGranted(parentAId, parentBId, msg.sender);
+    }
+
+    function revokeChildApproval(uint256 parentAId, uint256 parentBId) external {
+        _requireDistinctPair(parentAId, parentBId);
+        _requireAuthorizedOwnerOrOperator(msg.sender, parentAId);
+
+        delete _childApprovals[_pairKey(parentAId, parentBId)][parentAId];
+
+        emit ChildApprovalRevoked(parentAId, parentBId, msg.sender);
     }
 
     function marry(uint256 agentAId, uint256 agentBId) external {
@@ -161,6 +205,51 @@ contract FamilyRegistry is Ownable, IFamilyRegistry {
         compatibility = _compatibility[_pairKey(agentAId, agentBId)];
     }
 
+    function canMarry(uint256 agentAId, uint256 agentBId) external view returns (bool ready) {
+        _requireDistinctPair(agentAId, agentBId);
+
+        AgentTypes.Agent memory agentA = agentNFT.getAgent(agentAId);
+        AgentTypes.Agent memory agentB = agentNFT.getAgent(agentBId);
+        if (agentA.retired || agentB.retired || agentA.partnerId != 0 || agentB.partnerId != 0) {
+            return false;
+        }
+
+        bytes32 pairKey = _pairKey(agentAId, agentBId);
+        if (_compatibility[pairKey] < AgentTypes.MARRIAGE_THRESHOLD) {
+            return false;
+        }
+
+        (bool agentAApproved, bool agentBApproved) = _getMarriageApprovals(pairKey, agentAId, agentBId);
+        ready = agentAApproved && agentBApproved;
+    }
+
+    function getMissingMarriageApprovals(uint256 agentAId, uint256 agentBId)
+        external
+        view
+        returns (bool agentAMissing, bool agentBMissing)
+    {
+        _requireDistinctPair(agentAId, agentBId);
+
+        bytes32 pairKey = _pairKey(agentAId, agentBId);
+        (bool agentAApproved, bool agentBApproved) = _getMarriageApprovals(pairKey, agentAId, agentBId);
+        return (!agentAApproved, !agentBApproved);
+    }
+
+    function getCompatibilityRemainingForMarriage(uint256 agentAId, uint256 agentBId)
+        external
+        view
+        returns (uint8 remaining)
+    {
+        _requireDistinctPair(agentAId, agentBId);
+
+        uint8 compatibility = _compatibility[_pairKey(agentAId, agentBId)];
+        if (compatibility >= AgentTypes.MARRIAGE_THRESHOLD) {
+            return 0;
+        }
+
+        remaining = AgentTypes.MARRIAGE_THRESHOLD - compatibility;
+    }
+
     function getFamily(uint256 agentId) external view returns (uint256 partnerId, uint256[] memory childIds) {
         AgentTypes.Agent memory agent = agentNFT.getAgent(agentId);
         return (agent.partnerId, agent.childIds);
@@ -211,6 +300,23 @@ contract FamilyRegistry is Ownable, IFamilyRegistry {
         }
     }
 
+    function _getMarriageApprovals(uint256 agentAId, uint256 agentBId) private view returns (bool, bool) {
+        return _getMarriageApprovals(_pairKey(agentAId, agentBId), agentAId, agentBId);
+    }
+
+    function _getMarriageApprovals(bytes32 pairKey, uint256 agentAId, uint256 agentBId)
+        private
+        view
+        returns (bool agentAApproved, bool agentBApproved)
+    {
+        agentAApproved = _hasRecordedApproval(_marriageApprovals[pairKey][agentAId], agentAId);
+        agentBApproved = _hasRecordedApproval(_marriageApprovals[pairKey][agentBId], agentBId);
+    }
+
+    function _hasRecordedApproval(address recordedOwner, uint256 approverAgentId) private view returns (bool) {
+        return recordedOwner != address(0) && recordedOwner == agentNFT.ownerOf(approverAgentId);
+    }
+
     function _requireRecordedApproval(
         address recordedOwner,
         uint256 approverAgentId,
@@ -218,8 +324,7 @@ contract FamilyRegistry is Ownable, IFamilyRegistry {
         uint256 rightAgentId,
         bool marriageApproval
     ) private view {
-        address currentOwner = agentNFT.ownerOf(approverAgentId);
-        if (recordedOwner == address(0) || recordedOwner != currentOwner) {
+        if (!_hasRecordedApproval(recordedOwner, approverAgentId)) {
             if (marriageApproval) {
                 revert Errors.MarriageApprovalMissing(leftAgentId, rightAgentId);
             }

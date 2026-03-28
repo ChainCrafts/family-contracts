@@ -16,6 +16,7 @@ contract DeployMonadFamily is Script {
     {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         uint256 initialRewardPool = vm.envOr("INITIAL_REWARD_POOL", uint256(0));
+        bool freezeModuleWiring = vm.envOr("FREEZE_MODULE_WIRING", false);
         address deployer = vm.addr(deployerPrivateKey);
 
         vm.startBroadcast(deployerPrivateKey);
@@ -29,6 +30,11 @@ contract DeployMonadFamily is Script {
         familyRegistry.setWorkEngine(address(workEngine));
         agentNFT.setWorkEngine(address(workEngine));
         agentNFT.setMarketplace(address(marketplace));
+
+        if (freezeModuleWiring) {
+            agentNFT.freezeModuleWiring();
+            familyRegistry.freezeModuleWiring();
+        }
 
         if (initialRewardPool != 0) {
             workEngine.fundRewardPool{value: initialRewardPool}();

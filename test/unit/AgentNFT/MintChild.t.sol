@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {AgentTypes} from "../../../src/libraries/AgentTypes.sol";
+import {Errors} from "../../../src/libraries/Errors.sol";
 import {BaseFixture} from "../../utils/BaseFixture.t.sol";
 
 contract AgentNFTMintChildTest is BaseFixture {
@@ -29,7 +30,7 @@ contract AgentNFTMintChildTest is BaseFixture {
         emit AgentBorn(expectedChildId, aliceAgentId, bobAgentId, "Mina");
 
         vm.prank(alice);
-        uint256 childId = agentNFT.mintChild(aliceAgentId, bobAgentId, "Mina", "ipfs://mina");
+        uint256 childId = agentNFT.mintChild(aliceAgentId, bobAgentId, alice, "Mina", "ipfs://mina");
 
         AgentTypes.Agent memory parentAAfter = agentNFT.getAgent(aliceAgentId);
         AgentTypes.Agent memory parentBAfter = agentNFT.getAgent(bobAgentId);
@@ -42,5 +43,53 @@ contract AgentNFTMintChildTest is BaseFixture {
         assertEq(child.balance, expectedContributionA + expectedContributionB);
         assertEq(parentAAfter.childIds[parentAAfter.childIds.length - 1], childId);
         assertEq(parentBAfter.childIds[parentBAfter.childIds.length - 1], childId);
+    }
+
+    function test_MintChildUsesExplicitRecipientInsteadOfCallerDerivedOwner() public {
+        _setCompatibilityToThreshold(aliceAgentId, bobAgentId);
+        _approveMarriageBoth(aliceAgentId, bobAgentId);
+
+        vm.prank(alice);
+        familyRegistry.marry(aliceAgentId, bobAgentId);
+
+        _approveChildBoth(aliceAgentId, bobAgentId);
+
+        vm.prank(alice);
+        uint256 childId = agentNFT.mintChild(aliceAgentId, bobAgentId, bob, "Mina", "ipfs://mina");
+
+        assertEq(agentNFT.ownerOf(childId), bob);
+    }
+
+    function test_RevertWhen_ChildRecipientIsNotAParentOwner() public {
+        _setCompatibilityToThreshold(aliceAgentId, bobAgentId);
+        _approveMarriageBoth(aliceAgentId, bobAgentId);
+
+        vm.prank(alice);
+        familyRegistry.marry(aliceAgentId, bobAgentId);
+
+        _approveChildBoth(aliceAgentId, bobAgentId);
+
+        vm.expectRevert(abi.encodeWithSelector(Errors.InvalidChildRecipient.selector, dave));
+
+        vm.prank(alice);
+        agentNFT.mintChild(aliceAgentId, bobAgentId, dave, "Mina", "ipfs://mina");
+    }
+
+    function test_GetAgentChildReadHelpersReturnFamilyLinks() public {
+        _setCompatibilityToThreshold(aliceAgentId, bobAgentId);
+        _approveMarriageBoth(aliceAgentId, bobAgentId);
+
+        vm.prank(alice);
+        familyRegistry.marry(aliceAgentId, bobAgentId);
+
+        _approveChildBoth(aliceAgentId, bobAgentId);
+
+        vm.prank(alice);
+        uint256 childId = agentNFT.mintChild(aliceAgentId, bobAgentId, alice, "Mina", "ipfs://mina");
+
+        assertEq(agentNFT.getAgentChildCount(aliceAgentId), 1);
+        assertEq(agentNFT.getAgentChildCount(bobAgentId), 1);
+        assertEq(agentNFT.getAgentChildAt(aliceAgentId, 0), childId);
+        assertEq(agentNFT.getAgentChildAt(bobAgentId, 0), childId);
     }
 }

@@ -29,6 +29,7 @@ contract E2EExample is Script {
         uint256 salePrice;
         string childName;
         string childCid;
+        bool freezeModuleWiring;
     }
 
     struct Deployment {
@@ -77,6 +78,7 @@ contract E2EExample is Script {
         params.salePrice = vm.envOr("E2E_SALE_PRICE", uint256(1 ether));
         params.childName = vm.envOr("E2E_CHILD_NAME", string("Nova"));
         params.childCid = vm.envOr("E2E_CHILD_CID", string("ipfs://nova"));
+        params.freezeModuleWiring = vm.envOr("FREEZE_MODULE_WIRING", true);
     }
 
     function _deployAndSeed(Actors memory actors, Params memory params) internal returns (Deployment memory deployment) {
@@ -92,6 +94,12 @@ contract E2EExample is Script {
         deployment.familyRegistry.setWorkEngine(address(deployment.workEngine));
         deployment.agentNFT.setWorkEngine(address(deployment.workEngine));
         deployment.agentNFT.setMarketplace(address(deployment.marketplace));
+
+        if (params.freezeModuleWiring) {
+            deployment.agentNFT.freezeModuleWiring();
+            deployment.familyRegistry.freezeModuleWiring();
+        }
+
         deployment.workEngine.fundRewardPool{value: params.initialRewardPool}();
 
         if (params.actorFunding != 0) {
@@ -133,7 +141,7 @@ contract E2EExample is Script {
 
         vm.broadcast(actors.alicePrivateKey);
         deployment.childId = deployment.agentNFT.mintChild(
-            deployment.aliceAgentId, deployment.bobAgentId, params.childName, params.childCid
+            deployment.aliceAgentId, deployment.bobAgentId, actors.alice, params.childName, params.childCid
         );
 
         vm.broadcast(actors.alicePrivateKey);
