@@ -28,7 +28,10 @@ contract AgentNFT is ERC721, Ownable, IAgentNFT {
     bool public moduleWiringFrozen;
 
     event AgentBorn(uint256 indexed childId, uint256 indexed parentAId, uint256 indexed parentBId, string name);
+    event AgentMovedOut(uint256 indexed parentId, uint256 indexed childId, uint256 unlockedBalance, uint256 houseFunding);
+    event AgentSicknessSet(uint256 indexed agentId, uint8 sicknessLevel, uint256 maxAge);
     event FamilyRegistrySet(address indexed previousRegistry, address indexed newRegistry);
+    event MarriageBalancesMerged(uint256 indexed agentAId, uint256 indexed agentBId, uint256 combinedBalance);
     event WorkEngineSet(address indexed previousEngine, address indexed newEngine);
     event MarketplaceSet(address indexed previousMarketplace, address indexed newMarketplace);
     event ModuleWiringFrozen();
@@ -104,7 +107,7 @@ contract AgentNFT is ERC721, Ownable, IAgentNFT {
         ChildTraits memory traits = ChildTraits({
             riskScore: riskScore, patience: patience, socialScore: socialScore, jobType: jobType
         });
-        agentId = _mintAgent(recipient, name, traits, personalityCID);
+        agentId = _mintAgent(recipient, name, traits, personalityCID, AgentTypes.ADULT_AGE, true);
         emit AgentBorn(agentId, 0, 0, name);
     }
 
@@ -145,6 +148,64 @@ contract AgentNFT is ERC721, Ownable, IAgentNFT {
         childId = _createChild(parentAId, parentBId, childOwner, childName, personalityCID);
 
         emit AgentBorn(childId, parentAId, parentBId, childName);
+    }
+
+    function moveOut(uint256 parentId, uint256 childId) external {
+        _requireMinted(parentId);
+        AgentTypes.Agent storage child = _getAgentStorage(childId);
+
+        if (
+            msg.sender != owner() && !ownerOrApproved(msg.sender, parentId) && !ownerOrApproved(msg.sender, childId)
+        ) {
+            revert Errors.NotAgentOwnerOrApproved(parentId, msg.sender);
+        }
+
+        if (!_isParentOfChild(parentId, childId)) {
+            revert Errors.NotParentOfChild(parentId, childId);
+        }
+
+        if (child.independent) {
+            revert Errors.AlreadyIndependent(childId);
+        }
+
+        if (child.age < AgentTypes.ADULT_AGE) {
+            revert Errors.AgentTooYoung(childId, child.age, AgentTypes.ADULT_AGE);
+        }
+
+        AgentTypes.Agent storage parent = _getAgentStorage(parentId);
+        _decreaseBalance(parent, parentId, AgentTypes.MOVE_OUT_HOUSE_FUND);
+
+        uint256 unlockedBalance = child.lockedBalance;
+        child.lockedBalance = 0;
+        child.balance += unlockedBalance + AgentTypes.MOVE_OUT_HOUSE_FUND;
+        child.independent = true;
+
+        emit AgentMovedOut(parentId, childId, unlockedBalance, AgentTypes.MOVE_OUT_HOUSE_FUND);
+    }
+
+    function setSickness(uint256 agentId, uint8 sicknessLevel) external onlyOwner {
+        AgentTypes.Agent storage agent = _getAgentStorage(agentId);
+        if (agent.retired) {
+            revert Errors.AgentRetired(agentId);
+        }
+
+        if (agent.age < AgentTypes.SICKNESS_ASSESSMENT_AGE) {
+            revert Errors.AgentTooYoung(agentId, agent.age, AgentTypes.SICKNESS_ASSESSMENT_AGE);
+        }
+
+        if (agent.sicknessEvaluated) {
+            revert Errors.SicknessAlreadySet(agentId);
+        }
+
+        if (sicknessLevel > AgentTypes.MAX_SICKNESS_PENALTY) {
+            revert Errors.InvalidSicknessLevel(sicknessLevel, AgentTypes.MAX_SICKNESS_PENALTY);
+        }
+
+        agent.sicknessLevel = sicknessLevel;
+        agent.sicknessEvaluated = true;
+        agent.maxAge = AgentTypes.MAX_AGE - sicknessLevel;
+
+        emit AgentSicknessSet(agentId, sicknessLevel, agent.maxAge);
     }
 
     function totalAgents() external view returns (uint256) {
@@ -221,7 +282,20 @@ contract AgentNFT is ERC721, Ownable, IAgentNFT {
         }
 
         AgentTypes.Agent storage agent = _getAgentStorage(agentId);
+        if (!agent.independent) {
+            revert Errors.MoveOutRequired(agentId);
+        }
+
         agent.balance += amount;
+    }
+
+    function decreaseBalance(uint256 agentId, uint256 amount) external onlyWorkEngine {
+        if (amount == 0) {
+            revert Errors.ZeroAmount();
+        }
+
+        AgentTypes.Agent storage agent = _getAgentStorage(agentId);
+        _decreaseBalance(agent, agentId, amount);
     }
 
     function retireAndDistribute(uint256 agentId)
@@ -247,7 +321,7 @@ contract AgentNFT is ERC721, Ownable, IAgentNFT {
         uint256 totalDistributed = sharePerChild * childCount;
 
         for (uint256 i = 0; i < childCount; ++i) {
-            _agents[agent.childIds[i]].balance += sharePerChild;
+            _creditLifecycleBalance(agent.childIds[i], sharePerChild);
         }
 
         communityAllocation = finalBalance - totalDistributed;
@@ -277,6 +351,23 @@ contract AgentNFT is ERC721, Ownable, IAgentNFT {
 
         agentA.partnerId = agentBId;
         agentB.partnerId = agentAId;
+        agentA.independent = true;
+        agentB.independent = true;
+
+        uint256 combinedBalance = agentA.balance + agentA.lockedBalance + agentB.balance + agentB.lockedBalance;
+
+        if (agentAId < agentBId) {
+            agentA.balance = (combinedBalance / 2) + (combinedBalance % 2);
+            agentB.balance = combinedBalance / 2;
+        } else {
+            agentB.balance = (combinedBalance / 2) + (combinedBalance % 2);
+            agentA.balance = combinedBalance / 2;
+        }
+
+        agentA.lockedBalance = 0;
+        agentB.lockedBalance = 0;
+
+        emit MarriageBalancesMerged(agentAId, agentBId, combinedBalance);
     }
 
     function _update(address to, uint256 tokenId, address auth) internal virtual override returns (address from) {
@@ -291,7 +382,9 @@ contract AgentNFT is ERC721, Ownable, IAgentNFT {
         address recipient,
         string calldata name,
         ChildTraits memory traits,
-        string calldata personalityCID
+        string calldata personalityCID,
+        uint256 initialAge,
+        bool independent
     )
         private
         returns (uint256 agentId)
@@ -312,6 +405,9 @@ contract AgentNFT is ERC721, Ownable, IAgentNFT {
         agent.riskScore = traits.riskScore;
         agent.patience = traits.patience;
         agent.socialScore = traits.socialScore;
+        agent.age = initialAge;
+        agent.maxAge = AgentTypes.MAX_AGE;
+        agent.independent = independent;
         agent.personalityCID = personalityCID;
     }
 
@@ -354,12 +450,12 @@ contract AgentNFT is ERC721, Ownable, IAgentNFT {
         uint256 parentAFunding = _childFunding(parentA.balance);
         uint256 parentBFunding = _childFunding(parentB.balance);
 
-        parentA.balance -= parentAFunding;
-        parentB.balance -= parentBFunding;
+        _decreaseBalance(parentA, parentAId, parentAFunding);
+        _decreaseBalance(parentB, parentBId, parentBFunding);
 
-        childId = _mintAgent(childOwner, childName, childTraits, personalityCID);
+        childId = _mintAgent(childOwner, childName, childTraits, personalityCID, 0, false);
 
-        _agents[childId].balance = parentAFunding + parentBFunding;
+        _agents[childId].lockedBalance = parentAFunding + parentBFunding;
         parentA.childIds.push(childId);
         parentB.childIds.push(childId);
     }
@@ -381,9 +477,38 @@ contract AgentNFT is ERC721, Ownable, IAgentNFT {
         return (parentBalance * AgentTypes.CHILD_FUNDING_BPS) / AgentTypes.BPS_DENOMINATOR;
     }
 
+    function _creditLifecycleBalance(uint256 agentId, uint256 amount) private {
+        AgentTypes.Agent storage agent = _agents[agentId];
+        if (agent.independent) {
+            agent.balance += amount;
+        } else {
+            agent.lockedBalance += amount;
+        }
+    }
+
+    function _decreaseBalance(AgentTypes.Agent storage agent, uint256 agentId, uint256 amount) private {
+        if (amount > agent.balance) {
+            revert Errors.InsufficientAgentBalance(agentId, amount, agent.balance);
+        }
+
+        agent.balance -= amount;
+    }
+
     function _getAgentStorage(uint256 agentId) private view returns (AgentTypes.Agent storage agent) {
         _requireMinted(agentId);
         agent = _agents[agentId];
+    }
+
+    function _isParentOfChild(uint256 parentId, uint256 childId) private view returns (bool) {
+        AgentTypes.Agent storage parent = _getAgentStorage(parentId);
+        uint256 childCount = parent.childIds.length;
+        for (uint256 i = 0; i < childCount; ++i) {
+            if (parent.childIds[i] == childId) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     function _requireWiringNotFrozen() private view {

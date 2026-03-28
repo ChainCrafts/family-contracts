@@ -61,4 +61,28 @@ contract FamilyRegistryMarriageTest is BaseFixture {
         vm.prank(alice);
         familyRegistry.marry(aliceAgentId, carolAgentId);
     }
+
+    function test_RevertWhen_MarryingUnderageAgent() public {
+        _setCompatibilityToThreshold(aliceAgentId, bobAgentId);
+        _approveMarriageBoth(aliceAgentId, bobAgentId);
+
+        vm.prank(alice);
+        familyRegistry.marry(aliceAgentId, bobAgentId);
+
+        _approveChildBoth(aliceAgentId, bobAgentId);
+
+        vm.prank(alice);
+        uint256 childId = agentNFT.mintChild(aliceAgentId, bobAgentId, alice, "Mina", "ipfs://mina");
+
+        vm.prank(alice);
+        familyRegistry.approveMarriage(childId, carolAgentId);
+
+        vm.prank(carol);
+        familyRegistry.approveMarriage(carolAgentId, childId);
+
+        vm.expectRevert(abi.encodeWithSelector(Errors.AgentTooYoung.selector, childId, 0, AgentTypes.ADULT_AGE));
+
+        vm.prank(alice);
+        familyRegistry.marry(childId, carolAgentId);
+    }
 }

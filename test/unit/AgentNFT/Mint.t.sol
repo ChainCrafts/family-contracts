@@ -52,7 +52,7 @@ contract AgentNFTMintTest is BaseFixture {
         assertEq(riskScore, 65);
         assertEq(patience, 44);
         assertEq(socialScore, 72);
-        assertEq(age, 0);
+        assertEq(age, AgentTypes.ADULT_AGE);
         assertEq(balance, 0);
         assertEq(partnerId, 0);
         assertFalse(retired);

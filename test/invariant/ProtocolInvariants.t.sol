@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {BaseFixture} from "../utils/BaseFixture.t.sol";
 import {ProtocolHandler} from "./handlers/ProtocolHandler.sol";
+import {AgentTypes} from "../../src/libraries/AgentTypes.sol";
 
 contract ProtocolInvariants is BaseFixture {
     ProtocolHandler internal handler;
@@ -27,7 +28,8 @@ contract ProtocolInvariants is BaseFixture {
         uint256 totalAgents = agentNFT.totalAgents();
 
         for (uint256 i = 1; i <= totalAgents; ++i) {
-            aggregateBalances += agentNFT.getAgent(i).balance;
+            AgentTypes.Agent memory agent = agentNFT.getAgent(i);
+            aggregateBalances += agent.balance + agent.lockedBalance;
         }
 
         assertEq(

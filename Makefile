@@ -27,7 +27,15 @@ LOCAL_DEMO_OWNER_CAROL ?= 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC
 FORGE_BUILD_OPTS ?=
 FORGE_TEST_OPTS ?= -vvv
 FORGE_SCRIPT_OPTS ?= --broadcast -vvv
-LOAD_ENV = set -a; if [ -f .env ]; then source <(grep -E '^[A-Za-z_][A-Za-z0-9_]*=' .env); fi; set +a
+LOAD_ENV = set -a; if [ -f .env ]; then source <(grep -E '^[A-Za-z_][A-Za-z0-9_]*=' .env); fi; \
+	for key_var in PRIVATE_KEY ALICE_PRIVATE_KEY BOB_PRIVATE_KEY CAROL_PRIVATE_KEY; do \
+		key_val="$${!key_var-}"; \
+		if [ -n "$$key_val" ] && [[ "$$key_val" != 0x* ]]; then \
+			printf -v "$$key_var" '0x%s' "$$key_val"; \
+			export "$$key_var"; \
+		fi; \
+	done; \
+	set +a
 
 .PHONY: help install build clean fmt fmt-check snapshot coverage test test-unit test-integration test-invariant test-match test-monad-fork anvil deploy-local dry-run-local seed-local rpc-local rpc-monad
 .PHONY: deploy-monad dry-run-monad seed-monad e2e-local e2e-monad dry-run-e2e-local dry-run-e2e-monad

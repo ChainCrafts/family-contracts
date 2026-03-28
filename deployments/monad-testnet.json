@@ -1,0 +1,52 @@
+{
+  "network": "monad-testnet",
+  "chainId": 10143,
+  "deployedAt": "2026-03-28",
+  "deployer": "0x8301eb30c92B619bEe4EC759e9b2C707EFE6eCFf",
+  "moduleWiringFrozen": false,
+  "initialRewardPoolWei": "0",
+  "contracts": {
+    "AgentNFT": {
+      "address": "0xAF6B89c51696B6A9Ba4167eDFbF35a8273004027",
+      "deployTxHash": "0x20b5642b7bbe294ea181f847a4da6364698656215a4dea37c97d71923179e48d",
+      "verified": true,
+      "verificationProvider": "sourcify",
+      "verificationStatus": "exact_match",
+      "explorerUrl": "https://testnet.monadvision.com/address/0xAF6B89c51696B6A9Ba4167eDFbF35a8273004027"
+    },
+    "FamilyRegistry": {
+      "address": "0x44BFe82D95E2Dc4E3dA899B71f5C1331092c3D9F",
+      "deployTxHash": "0x30e28c86739431f6e5d4f1d3a3dc2821b8b8c52bffca3adc18819e821be9082d",
+      "verified": true,
+      "verificationProvider": "sourcify",
+      "verificationStatus": "exact_match",
+      "explorerUrl": "https://testnet.monadvision.com/address/0x44BFe82D95E2Dc4E3dA899B71f5C1331092c3D9F"
+    },
+    "WorkEngine": {
+      "address": "0x2F7FeE5FBb7F1c1f84d8885b0185c6a193dAc1bc",
+      "deployTxHash": "0xae6e461b2947900fc67472e077a00ed6d77c9c8379fa379d02f37a84e98e8790",
+      "verified": true,
+      "verificationProvider": "sourcify",
+      "verificationStatus": "exact_match",
+      "explorerUrl": "https://testnet.monadvision.com/address/0x2F7FeE5FBb7F1c1f84d8885b0185c6a193dAc1bc"
+    },
+    "Marketplace": {
+      "address": "0xa60fD4cdc8600AEd6CD5a9E8c6e39a56f863e3cD",
+      "deployTxHash": "0xa465ac4db1696ed9f7169fecb5cee5694c077b0f03c51f366b9483129467af8a",
+      "verified": true,
+      "verificationProvider": "sourcify",
+      "verificationStatus": "exact_match",
+      "explorerUrl": "https://testnet.monadvision.com/address/0xa60fD4cdc8600AEd6CD5a9E8c6e39a56f863e3cD"
+    }
+  },
+  "wiringTxHashes": {
+    "setFamilyRegistry": "0x4a4838cff26b2232bb6b8787cec4f38a5dd29bfd6f91425fa3fe22781b63da45",
+    "setWorkEngineOnFamilyRegistry": "0x0bfc7f950d29d151623b9548dab8270c89fe041502fc98888f7410b1025f6440",
+    "setWorkEngineOnAgentNFT": "0xd6c036e640a0871eaee495e3ca80e49ca11fe67f217d425f963bbfae021489d1",
+    "setMarketplace": "0x3cc3523c8eebcfbbb215af3e560e76ed797b5754207ba716c290067b7a01ec95"
+  },
+  "artifacts": {
+    "broadcast": "/home/asus/family-contracts/broadcast/DeployMonadFamily.s.sol/10143/run-latest.json",
+    "cache": "/home/asus/family-contracts/cache/DeployMonadFamily.s.sol/10143/run-latest.json"
+  }
+}

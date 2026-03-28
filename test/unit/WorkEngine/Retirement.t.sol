@@ -22,8 +22,7 @@ contract WorkEngineRetirementTest is BaseFixture {
         vm.expectEmit(address(workEngine));
         emit AgentRetired(carolAgentId, expectedFinalBalance);
 
-        vm.prank(carol);
-        workEngine.work(carolAgentId, 0);
+        _workAs(carol, carolAgentId, 0);
 
         AgentTypes.Agent memory retiredAgent = agentNFT.getAgent(carolAgentId);
 
@@ -54,15 +53,15 @@ contract WorkEngineRetirementTest is BaseFixture {
         uint256 expectedEarned = _expectedReward(parentBeforeFinalWork, aliceAgentId, 0);
         uint256 expectedFinalBalance = parentBeforeFinalWork.balance + expectedEarned;
 
-        vm.prank(alice);
-        workEngine.work(aliceAgentId, 0);
+        _workAs(alice, aliceAgentId, 0);
 
         AgentTypes.Agent memory childAfter = agentNFT.getAgent(childId);
         AgentTypes.Agent memory retiredParent = agentNFT.getAgent(aliceAgentId);
 
         assertTrue(retiredParent.retired);
         assertEq(retiredParent.balance, 0);
-        assertEq(childAfter.balance, childBefore.balance + expectedFinalBalance);
+        assertEq(childAfter.balance, childBefore.balance);
+        assertEq(childAfter.lockedBalance, childBefore.lockedBalance + expectedFinalBalance);
     }
 
     function test_RetirementDistributesAcrossMultipleChildrenAndCreditsRemainder() public {
@@ -96,8 +95,10 @@ contract WorkEngineRetirementTest is BaseFixture {
 
         uint256 communityPoolBefore = workEngine.communityPoolBalance();
         uint256[] memory childBalancesBefore = new uint256[](childIds.length);
+        uint256[] memory childLockedBalancesBefore = new uint256[](childIds.length);
         for (uint256 i = 0; i < childIds.length; ++i) {
             childBalancesBefore[i] = agentNFT.getAgent(childIds[i]).balance;
+            childLockedBalancesBefore[i] = agentNFT.getAgent(childIds[i]).lockedBalance;
         }
 
         vm.expectEmit(address(workEngine));
@@ -106,15 +107,15 @@ contract WorkEngineRetirementTest is BaseFixture {
         vm.expectEmit(address(workEngine));
         emit AgentRetired(aliceAgentId, expectedFinalBalance);
 
-        vm.prank(alice);
-        workEngine.work(aliceAgentId, 0);
+        _workAs(alice, aliceAgentId, 0);
 
         AgentTypes.Agent memory retiredParent = agentNFT.getAgent(aliceAgentId);
         assertTrue(retiredParent.retired);
         assertEq(retiredParent.balance, 0);
         assertEq(workEngine.communityPoolBalance(), communityPoolBefore + remainder);
         for (uint256 i = 0; i < childIds.length; ++i) {
-            assertEq(agentNFT.getAgent(childIds[i]).balance, childBalancesBefore[i] + sharePerChild);
+            assertEq(agentNFT.getAgent(childIds[i]).balance, childBalancesBefore[i]);
+            assertEq(agentNFT.getAgent(childIds[i]).lockedBalance, childLockedBalancesBefore[i] + sharePerChild);
         }
     }
 
@@ -131,8 +132,7 @@ contract WorkEngineRetirementTest is BaseFixture {
         address agentOwner = agentNFT.ownerOf(agentId);
 
         while (agentNFT.getAgent(agentId).age < targetAge) {
-            vm.prank(agentOwner);
-            workEngine.work(agentId, 0);
+            _workAs(agentOwner, agentId, 0);
         }
     }
 

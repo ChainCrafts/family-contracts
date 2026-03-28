@@ -19,8 +19,7 @@ contract LifecycleFlowIntegrationTest is BaseFixture {
 
         address aliceOwner = agentNFT.ownerOf(aliceAgentId);
         while (agentNFT.getAgent(aliceAgentId).age < AgentTypes.MAX_AGE) {
-            vm.prank(aliceOwner);
-            workEngine.work(aliceAgentId, 0);
+            _workAs(aliceOwner, aliceAgentId, 0);
         }
 
         AgentTypes.Agent memory retiredAlice = agentNFT.getAgent(aliceAgentId);
@@ -28,6 +27,7 @@ contract LifecycleFlowIntegrationTest is BaseFixture {
 
         assertTrue(retiredAlice.retired);
         assertEq(retiredAlice.balance, 0);
-        assertGt(child.balance, 0);
+        assertEq(child.balance, 0);
+        assertGt(child.lockedBalance, 0);
     }
 }

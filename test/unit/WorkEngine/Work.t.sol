@@ -45,7 +45,7 @@ contract WorkEngineWorkTest is BaseFixture {
         vm.prank(operator);
         workEngine.work(aliceAgentId, 0);
 
-        assertEq(agentNFT.getAgent(aliceAgentId).age, 1);
+        assertEq(agentNFT.getAgent(aliceAgentId).age, AgentTypes.ADULT_AGE + 1);
     }
 
     function test_WorkCapsCompatibilityAtOneHundred() public {
@@ -108,7 +108,42 @@ contract WorkEngineWorkTest is BaseFixture {
         vm.prank(alice);
         workEngine.work(aliceAgentId, 0);
 
-        assertEq(agentNFT.getAgent(aliceAgentId).age, 1);
+        assertEq(agentNFT.getAgent(aliceAgentId).age, AgentTypes.ADULT_AGE + 1);
+    }
+
+    function test_MinorsAgeWithoutRewardsUntilMoveOut() public {
+        _setCompatibilityToThreshold(aliceAgentId, bobAgentId);
+        _approveMarriageBoth(aliceAgentId, bobAgentId);
+
+        vm.prank(alice);
+        familyRegistry.marry(aliceAgentId, bobAgentId);
+
+        _approveChildBoth(aliceAgentId, bobAgentId);
+
+        vm.prank(alice);
+        uint256 childId = agentNFT.mintChild(aliceAgentId, bobAgentId, alice, "Mina", "ipfs://mina");
+
+        uint256 rewardPoolBefore = workEngine.rewardPoolBalance();
+
+        vm.prank(alice);
+        workEngine.work(childId, 0);
+
+        AgentTypes.Agent memory child = agentNFT.getAgent(childId);
+        assertEq(child.age, 1);
+        assertEq(child.balance, 0);
+        assertEq(workEngine.rewardPoolBalance(), rewardPoolBefore);
+    }
+
+    function test_RevertWhen_SicknessAssessmentIsMissingAtSixty() public {
+        while (agentNFT.getAgent(carolAgentId).age < AgentTypes.SICKNESS_ASSESSMENT_AGE) {
+            vm.prank(carol);
+            workEngine.work(carolAgentId, 0);
+        }
+
+        vm.expectRevert(abi.encodeWithSelector(Errors.SicknessAssessmentRequired.selector, carolAgentId));
+
+        vm.prank(carol);
+        workEngine.work(carolAgentId, 0);
     }
 
     function _expectedReward(AgentTypes.Agent memory agent, uint256 agentId, uint256 counterpartyId)

@@ -50,6 +50,9 @@ interface IAgentNFT is IERC721 {
     function getAgentChildAt(uint256 agentId, uint256 index) external view returns (uint256 childId);
     function incrementAge(uint256 agentId) external returns (uint256 newAge);
     function increaseBalance(uint256 agentId, uint256 amount) external;
+    function decreaseBalance(uint256 agentId, uint256 amount) external;
+    function moveOut(uint256 parentId, uint256 childId) external;
+    function setSickness(uint256 agentId, uint8 sicknessLevel) external;
     function retireAndDistribute(uint256 agentId) external returns (uint256 finalBalance, uint256 communityAllocation);
     function setPartnerIds(uint256 agentAId, uint256 agentBId) external;
 }

@@ -86,14 +86,46 @@ abstract contract BaseFixture is Test {
     }
 
     function _workAs(address caller, uint256 agentId, uint256 counterpartyId) internal {
+        _prepareAgentForWork(agentId);
         vm.prank(caller);
         workEngine.work(agentId, counterpartyId);
     }
 
     function _setCompatibilityToThreshold(uint256 agentAId, uint256 agentBId) internal {
         while (familyRegistry.getCompatibility(agentAId, agentBId) < AgentTypes.MARRIAGE_THRESHOLD) {
-            vm.prank(agentNFT.ownerOf(agentAId));
-            workEngine.work(agentAId, agentBId);
+            _workAs(agentNFT.ownerOf(agentAId), agentAId, agentBId);
         }
+    }
+
+    function _prepareAgentForWork(uint256 agentId) internal {
+        AgentTypes.Agent memory agent = agentNFT.getAgent(agentId);
+
+        if (agent.age >= AgentTypes.ADULT_AGE && !agent.independent) {
+            uint256 parentId = _findParentId(agentId);
+            if (parentId != 0) {
+                vm.prank(owner);
+                agentNFT.moveOut(parentId, agentId);
+                agent = agentNFT.getAgent(agentId);
+            }
+        }
+
+        if (agent.age >= AgentTypes.SICKNESS_ASSESSMENT_AGE && !agent.sicknessEvaluated) {
+            vm.prank(owner);
+            agentNFT.setSickness(agentId, 0);
+        }
+    }
+
+    function _findParentId(uint256 childId) internal view returns (uint256 parentId) {
+        uint256 totalAgents = agentNFT.totalAgents();
+        for (uint256 i = 1; i <= totalAgents; ++i) {
+            uint256 childCount = agentNFT.getAgentChildCount(i);
+            for (uint256 j = 0; j < childCount; ++j) {
+                if (agentNFT.getAgentChildAt(i, j) == childId) {
+                    return i;
+                }
+            }
+        }
+
+        return 0;
     }
 }

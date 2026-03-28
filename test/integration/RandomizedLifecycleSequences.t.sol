@@ -81,8 +81,9 @@ contract RandomizedLifecycleSequencesIntegrationTest is BaseFixture {
         assertEq(handler.successfulRetiredWorkCalls(), 0);
 
         for (uint256 i = 1; i <= totalAgents; ++i) {
-            (,,,,,, uint256 balance, uint256 partnerId,) = agentNFT.getAgentCore(i);
-            aggregateBalances += balance;
+            AgentTypes.Agent memory agent = agentNFT.getAgent(i);
+            aggregateBalances += agent.balance + agent.lockedBalance;
+            uint256 partnerId = agent.partnerId;
 
             if (partnerId != 0) {
                 (,,,,,,, uint256 reciprocalPartnerId,) = agentNFT.getAgentCore(partnerId);

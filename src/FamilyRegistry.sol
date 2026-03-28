@@ -153,6 +153,14 @@ contract FamilyRegistry is Ownable, IFamilyRegistry {
             revert Errors.AlreadyMarried(agentBId);
         }
 
+        if (agentA.age < AgentTypes.ADULT_AGE) {
+            revert Errors.AgentTooYoung(agentAId, agentA.age, AgentTypes.ADULT_AGE);
+        }
+
+        if (agentB.age < AgentTypes.ADULT_AGE) {
+            revert Errors.AgentTooYoung(agentBId, agentB.age, AgentTypes.ADULT_AGE);
+        }
+
         bytes32 pairKey = _pairKey(agentAId, agentBId);
         uint8 compatibility = _compatibility[pairKey];
         if (compatibility < AgentTypes.MARRIAGE_THRESHOLD) {
@@ -210,7 +218,10 @@ contract FamilyRegistry is Ownable, IFamilyRegistry {
 
         AgentTypes.Agent memory agentA = agentNFT.getAgent(agentAId);
         AgentTypes.Agent memory agentB = agentNFT.getAgent(agentBId);
-        if (agentA.retired || agentB.retired || agentA.partnerId != 0 || agentB.partnerId != 0) {
+        if (
+            agentA.retired || agentB.retired || agentA.partnerId != 0 || agentB.partnerId != 0
+                || agentA.age < AgentTypes.ADULT_AGE || agentB.age < AgentTypes.ADULT_AGE
+        ) {
             return false;
         }
 

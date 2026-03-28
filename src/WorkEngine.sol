@@ -59,14 +59,36 @@ contract WorkEngine is Ownable, Pausable, IWorkEngine {
             revert Errors.NotAgentOwnerOrApproved(agentId, msg.sender);
         }
 
+        if (agent.age >= agent.maxAge) {
+            _retireAgent(agentId);
+            return;
+        }
+
+        if (agent.age >= AgentTypes.SICKNESS_ASSESSMENT_AGE && !agent.sicknessEvaluated) {
+            revert Errors.SicknessAssessmentRequired(agentId);
+        }
+
+        if (!agent.independent) {
+            if (agent.age >= AgentTypes.ADULT_AGE) {
+                revert Errors.MoveOutRequired(agentId);
+            }
+
+            uint256 newMinorAge = agentNFT.incrementAge(agentId);
+            emit AgentWorked(agentId, 0, newMinorAge);
+            return;
+        }
+
         if (counterpartyId != 0) {
             if (counterpartyId == agentId) {
                 revert Errors.InvalidPair(agentId, counterpartyId);
             }
 
             AgentTypes.Agent memory counterparty = agentNFT.getAgent(counterpartyId);
-            if (counterparty.retired) {
-                revert Errors.AgentRetired(counterpartyId);
+            if (
+                counterparty.retired || !counterparty.independent
+                    || (counterparty.age >= AgentTypes.SICKNESS_ASSESSMENT_AGE && !counterparty.sicknessEvaluated)
+            ) {
+                revert Errors.InvalidCounterparty(counterpartyId);
             }
 
             familyRegistry.incrementCompatibility(agentId, counterpartyId);
@@ -83,15 +105,8 @@ contract WorkEngine is Ownable, Pausable, IWorkEngine {
         uint256 newAge = agentNFT.incrementAge(agentId);
         emit AgentWorked(agentId, earned, newAge);
 
-        if (newAge >= AgentTypes.MAX_AGE) {
-            (uint256 finalBalance, uint256 communityAllocation) = agentNFT.retireAndDistribute(agentId);
-            communityPoolBalance += communityAllocation;
-
-            if (communityAllocation != 0) {
-                emit CommunityPoolCredited(agentId, communityAllocation, communityPoolBalance);
-            }
-
-            emit AgentRetired(agentId, finalBalance);
+        if (newAge >= agent.maxAge) {
+            _retireAgent(agentId);
         }
     }
 
@@ -104,18 +119,48 @@ contract WorkEngine is Ownable, Pausable, IWorkEngine {
             revert Errors.AgentRetired(agentId);
         }
 
+        if (agent.age >= agent.maxAge) {
+            return 0;
+        }
+
+        if (agent.age >= AgentTypes.SICKNESS_ASSESSMENT_AGE && !agent.sicknessEvaluated) {
+            revert Errors.SicknessAssessmentRequired(agentId);
+        }
+
+        if (!agent.independent) {
+            if (agent.age >= AgentTypes.ADULT_AGE) {
+                revert Errors.MoveOutRequired(agentId);
+            }
+
+            return 0;
+        }
+
         if (counterpartyId != 0) {
             if (counterpartyId == agentId) {
                 revert Errors.InvalidPair(agentId, counterpartyId);
             }
 
             AgentTypes.Agent memory counterparty = agentNFT.getAgent(counterpartyId);
-            if (counterparty.retired) {
-                revert Errors.AgentRetired(counterpartyId);
+            if (
+                counterparty.retired || !counterparty.independent
+                    || (counterparty.age >= AgentTypes.SICKNESS_ASSESSMENT_AGE && !counterparty.sicknessEvaluated)
+            ) {
+                revert Errors.InvalidCounterparty(counterpartyId);
             }
         }
 
         earned = _calculateReward(agentId, agent.age, counterpartyId, agent.riskScore);
+    }
+
+    function _retireAgent(uint256 agentId) private {
+        (uint256 finalBalance, uint256 communityAllocation) = agentNFT.retireAndDistribute(agentId);
+        communityPoolBalance += communityAllocation;
+
+        if (communityAllocation != 0) {
+            emit CommunityPoolCredited(agentId, communityAllocation, communityPoolBalance);
+        }
+
+        emit AgentRetired(agentId, finalBalance);
     }
 
     function _calculateReward(uint256 agentId, uint256 currentAge, uint256 counterpartyId, uint8 riskScore)

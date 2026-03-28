@@ -10,8 +10,7 @@ contract MarketplaceLifecycleIntegrationTest is BaseFixture {
         vm.deal(alice, 3 ether);
 
         while (agentNFT.getAgent(carolAgentId).age < AgentTypes.MAX_AGE) {
-            vm.prank(carol);
-            workEngine.work(carolAgentId, 0);
+            _workAs(carol, carolAgentId, 0);
         }
 
         vm.prank(carol);

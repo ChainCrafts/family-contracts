@@ -13,6 +13,9 @@ contract AuthorizationMatrixIntegrationTest is BaseFixture {
         agentNFT.increaseBalance(aliceAgentId, 1 ether);
 
         vm.expectRevert(abi.encodeWithSelector(Errors.UnauthorizedModule.selector, address(this)));
+        agentNFT.decreaseBalance(aliceAgentId, 1 ether);
+
+        vm.expectRevert(abi.encodeWithSelector(Errors.UnauthorizedModule.selector, address(this)));
         agentNFT.retireAndDistribute(aliceAgentId);
 
         vm.expectRevert(abi.encodeWithSelector(Errors.UnauthorizedModule.selector, address(this)));
